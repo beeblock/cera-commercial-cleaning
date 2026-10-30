@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.tmp/
+test-results/
+playwright-report/
+*.log
+.env*
+!.env.example
+.vercel
+# The original export is not part of the React application.
+/stitch_cera_commercial_cleaning_website/
