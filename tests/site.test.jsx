@@ -141,6 +141,10 @@ describe("proposal request", () => {
       [/Email Address/, "test@example.com"],
       [/Phone Number/, "+1 555 0100"],
       [/Facility Address/, "Test Address"],
+      [/Total Square Footage/, "25000"],
+      [/Number of Floors/, "2"],
+      [/Preferred Start Date/, "2030-01-15"],
+      [/Additional Details/, "Please call before arriving."],
     ])
       fireEvent.change(screen.getByLabelText(label), { target: { value } });
     fireEvent.click(
@@ -179,6 +183,9 @@ describe("proposal request", () => {
     );
     expect(screen.getByRole("button", { name: "SENDING…" })).toBeDisabled();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Company \/ Business Name/)).toHaveValue(
+      "Test Company",
+    );
     fireEvent.submit(document.querySelector("form"));
     expect(fetcher).toHaveBeenCalledTimes(1);
     const [url, options] = fetcher.mock.calls[0];
@@ -194,22 +201,62 @@ describe("proposal request", () => {
     expect(status).toHaveTextContent("Your proposal request has been sent");
     expect(status).toHaveFocus();
     expect(screen.getByRole("button", { name: "REQUEST SENT" })).toBeDisabled();
+    for (const field of document.querySelectorAll(
+      'form input:not([type="radio"]), form textarea, form select',
+    )) {
+      expect(field).toHaveValue("");
+    }
+    expect(
+      screen.getByRole("radio", { name: "Corporate Offices" }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole("radio", { name: "Healthcare Facilities" }),
+    ).not.toBeChecked();
+  });
+
+  it("allows a new request after clearing the successful submission", async () => {
+    const fetcher = vi
+      .fn()
+      .mockImplementation(() =>
+        Promise.resolve(Response.json({ success: true })),
+      );
+    vi.stubGlobal("fetch", fetcher);
+    renderPage(<ProposalPage />);
+    fillProposal();
+    fireEvent.click(screen.getByRole("radio", { name: "Corporate Offices" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "SUBMIT REQUEST" }),
+    );
+    expect(await screen.findByRole("status")).toBeVisible();
+    expect(
+      screen.getByRole("radio", { name: "Corporate Offices" }),
+    ).toBeChecked();
+    fillProposal();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "SUBMIT REQUEST" }),
+    );
+    expect(await screen.findByRole("status")).toBeVisible();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    const first = JSON.parse(fetcher.mock.calls[0][1].body);
+    const second = JSON.parse(fetcher.mock.calls[1][1].body);
+    expect(first.industry).toBe("corporate");
+    expect(second.industry).toBe("healthcare");
+    expect(second.requestId).not.toBe(first.requestId);
   });
 
   it("keeps the form data and focuses a field rejected by the server", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          Response.json(
-            {
-              error: "Please check the highlighted fields.",
-              errors: { email: "Please enter a valid email address." },
-            },
-            { status: 400 },
-          ),
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            error: "Please check the highlighted fields.",
+            errors: { email: "Please enter a valid email address." },
+          },
+          { status: 400 },
         ),
+      ),
     );
     renderPage(<ProposalPage />);
     fillProposal();
@@ -223,6 +270,12 @@ describe("proposal request", () => {
     expect(screen.getByLabelText(/Company \/ Business Name/)).toHaveValue(
       "Test Company",
     );
+    expect(screen.getByLabelText(/Additional Details/)).toHaveValue(
+      "Please call before arriving.",
+    );
+    expect(
+      screen.getByRole("radio", { name: "Healthcare Facilities" }),
+    ).toBeChecked();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 

@@ -69,6 +69,10 @@ export function useProposal() {
         );
         return;
       }
+      form.reset();
+      setIndustry("corporate");
+      startedAt.current = Date.now();
+      previousAttempt.current = null;
       setIsSuccess(true);
     } catch {
       setError(fallbackError);
